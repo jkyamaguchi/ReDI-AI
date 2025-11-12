@@ -1,0 +1,12 @@
+# Ignore large/raw data files
+Project/data/*.csv
+Covid-19/*.csv
+# Optional: ignore parquet if generated
+# Project/data/*.parquet
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
