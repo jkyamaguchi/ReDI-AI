@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cart</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="../css/base.css" />
+  <link rel="stylesheet" href="../css/cart.css" />
+</head>
+<body>
+  <header>
+    <a href="index.html">Home</a>
+    <a href="wine.html">Wines</a>
+  </header>
+
+  <h1>Cart Center</h1>
+  <button id="openCartBtn">View Cart (<span id="cartCount">0</span>)</button>
+
+  <!-- Modal structure -->
+  <div class="cart-overlay" id="cartOverlay" role="dialog" aria-modal="true">
+    <div class="cart-modal" id="cartModal">
+      <h2>Your Cart</h2>
+      <div id="cartItems"></div>
+      <div class="total-line" id="cartTotal"></div>
+      <div class="cart-actions">
+        <button class="btn-close" id="closeCart">Close</button>
+        <button class="btn-clear" id="clearCart">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../js/products.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.cartAPI) window.cartAPI.updateCartCount();
+    });
+
+    document.getElementById('openCartBtn').addEventListener('click', () => {
+      if (window.cartAPI) window.cartAPI.openCart();
+    });
+  </script>
+</body>
+</html>

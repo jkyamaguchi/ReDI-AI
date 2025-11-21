@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Wines</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/products.css" />
+    <style></style>
+  </head>
+  <body>
+    <div id="site-header"></div>
+
+    <h1 style="margin: 18px">Wine Selection</h1>
+    <div class="grid" id="wineGrid">
+      <!-- Static cards with images -->
+      <div class="card">
+        <img
+          src="https://via.placeholder.com/300x150?text=Cabernet+Reserva"
+          alt="Cabernet Reserva bottle"
+        />
+        <h3>Cabernet Reserva</h3>
+        <div class="price">$29.90</div>
+        <p>Rich dark fruit, 12 months oak.</p>
+        <button data-category="wines" data-id="wine-1">Add to Cart</button>
+      </div>
+      <div class="card">
+        <img
+          src="https://via.placeholder.com/300x150?text=Pinot+Noir+Estate"
+          alt="Pinot Noir Estate bottle"
+        />
+        <h3>Pinot Noir Estate</h3>
+        <div class="price">$34.00</div>
+        <p>Bright cherry, silky tannins.</p>
+        <button data-category="wines" data-id="wine-2">Add to Cart</button>
+      </div>
+      <div class="card">
+        <img
+          src="https://via.placeholder.com/300x150?text=Chardonnay+Classic"
+          alt="Chardonnay Classic bottle"
+        />
+        <h3>Chardonnay Classic</h3>
+        <div class="price">$22.50</div>
+        <p>Balanced oak & citrus.</p>
+        <button data-category="wines" data-id="wine-3">Add to Cart</button>
+      </div>
+      <div class="card">
+        <img
+          src="https://via.placeholder.com/300x150?text=Sauvignon+Blanc"
+          alt="Sauvignon Blanc bottle"
+        />
+        <h3>Sauvignon Blanc</h3>
+        <div class="price">$18.75</div>
+        <p>Crisp tropical notes.</p>
+        <button data-category="wines" data-id="wine-4">Add to Cart</button>
+      </div>
+      <div class="card">
+        <img
+          src="https://via.placeholder.com/300x150?text=Rose+Provence"
+          alt="Rosé Provence bottle"
+        />
+        <h3>Rosé Provence</h3>
+        <div class="price">$19.90</div>
+        <p>Dry, floral, summer style.</p>
+        <button data-category="wines" data-id="wine-5">Add to Cart</button>
+      </div>
+      <div class="card">
+        <img
+          src="https://via.placeholder.com/300x150?text=Malbec+Premium"
+          alt="Malbec Premium bottle"
+        />
+        <h3>Malbec Premium</h3>
+        <div class="price">$27.40</div>
+        <p>Plum, cocoa, smooth finish.</p>
+        <button data-category="wines" data-id="wine-6">Add to Cart</button>
+      </div>
+    </div>
+
+    <!-- Global cart overlay injected by header.js -->
+
+    <footer>© 2025 Store</footer>
+
+    <script src="../js/header.js"></script>
+    <script src="../js/products.js"></script>
+  </body>
+</html>
