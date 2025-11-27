@@ -1,0 +1,1 @@
+https://raw.githack.com/jkyamaguchi/ReDI-AI/main/Project/src/web/html/index.html
