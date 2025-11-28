@@ -21,16 +21,17 @@
 }
 .cart-modal {
   background: #fff;
-  width: 340px;
-  max-height: 72vh;
+  width: 420px;
+  max-width: 92vw;
+  max-height: 78vh;
   overflow: auto;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
 }
 .cart-modal h2 {
-  margin: 0 0 10px;
-  font-size: 18px;
+  margin: 0 0 12px;
+  font-size: 20px;
 }
 .cart-item {
   display: flex;
@@ -70,9 +71,9 @@
 }
 .total-line {
   text-align: right;
-  margin-top: 8px;
+  margin-top: 10px;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 16px;
 }
 .cart-actions {
   margin-top: 12px;
