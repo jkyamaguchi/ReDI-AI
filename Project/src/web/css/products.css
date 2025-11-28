@@ -43,12 +43,3 @@
   border-radius: 4px;
   margin-top: auto;
 }
-#cartBar {
-  background: #243447;
-  color: #fff;
-  padding: 6px 14px;
-  font-size: 13px;
-}
-#cartBar span {
-  font-weight: bold;
-}
