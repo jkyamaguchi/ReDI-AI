@@ -38,12 +38,12 @@
       { id: "fruit-6", name: "Mango (each)", price: 2.2 },
     ],
     gold: [
-      { id: "gold-1", name: "Gold Bar 1oz", price: 2350.0 },
-      { id: "gold-2", name: "Gold Bar 10g", price: 760.0 },
-      { id: "gold-3", name: "Gold Coin 1oz", price: 2375.0 },
-      { id: "gold-4", name: "Gold Coin 1/2oz", price: 1205.0 },
-      { id: "gold-5", name: "Gold Pendant", price: 450.0 },
-      { id: "gold-6", name: "Gold Ring", price: 520.0 },
+      { id: "gold-1", name: "Infinity Necklace", price: 2350.0 },
+      { id: "gold-2", name: "Hoop Earrings", price: 760.0 },
+      { id: "gold-3", name: "Bracelet", price: 2375.0 },
+      { id: "gold-4", name: "Coin Pendant", price: 1205.0 },
+      { id: "gold-5", name: "Rainbow Ring", price: 450.0 },
+      { id: "gold-6", name: "Pocket watch", price: 520.0 },
     ],
     sweets: [
       { id: "sweet-1", name: "Chocolate Truffles", price: 6.5 },
@@ -121,8 +121,7 @@
     if (!wrap || !totalEl) return;
     const cart = loadCart();
     if (!cart.length) {
-      wrap.innerHTML =
-        '<div style="text-align:center;color:#666;padding:16px;">Cart is empty.</div>';
+      wrap.innerHTML = '<div class="empty">Cart is empty.</div>';
       totalEl.textContent = "";
       if (barEl) barEl.textContent = "Categories: none";
       return;
@@ -134,47 +133,56 @@
       return acc;
     }, {});
     let total = 0;
-    let html = "";
-    Object.keys(byCategory)
-      .sort()
-      .forEach((cat) => {
-        html += `<div style="margin:8px 0 4px;font-weight:bold;font-size:12px;color:#243447;text-transform:uppercase;">${cat}</div>`;
-        byCategory[cat].forEach((item) => {
-          total += item.price * item.qty;
-          html += `
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding:6px 0;font-size:13px;" data-id="${
-          item.id
-        }">
-          <div style="flex:1 1 auto;">
-            ${item.name}<br><small>$${item.price.toFixed(2)} each</small>
-          </div>
-          <div style="display:flex;align-items:center;gap:4px;">
-            <button class="qty-btn" data-act="dec" data-id="${
-              item.id
-            }" style="background:#0078d4;color:#fff;border:0;padding:2px 6px;border-radius:4px;cursor:pointer;">−</button>
-            <span style="min-width:20px;text-align:center;font-weight:bold;">${
-              item.qty
-            }</span>
-            <button class="qty-btn" data-act="inc" data-id="${
-              item.id
-            }" style="background:#0078d4;color:#fff;border:0;padding:2px 6px;border-radius:4px;cursor:pointer;">+</button>
-            <button class="remove-btn" data-act="remove" data-id="${
-              item.id
-            }" style="background:#e0e0e0;border:0;padding:2px 6px;border-radius:4px;cursor:pointer;">x</button>
-          </div>
-        </div>`;
-        });
-      });
+    const groups = Object.keys(byCategory).sort();
+    const html = groups
+      .map((cat) => {
+        const items = byCategory[cat]
+          .map((item) => {
+            total += item.price * item.qty;
+            return `
+              <li class="cart-item" data-id="${item.id}">
+                <div class="cart-item__info">
+                  <span class="cart-item__name">${item.name}</span>
+                  <span class="cart-item__unit-price">$${item.price.toFixed(
+                    2
+                  )} each</span>
+                </div>
+                <div class="cart-item__controls">
+                  <button class="qty-btn" data-act="dec" data-id="${
+                    item.id
+                  }" aria-label="Decrease quantity">−</button>
+                  <output class="qty" aria-live="polite">${item.qty}</output>
+                  <button class="qty-btn" data-act="inc" data-id="${
+                    item.id
+                  }" aria-label="Increase quantity">+</button>
+                  <button class="btn-remove" data-act="remove" data-id="${
+                    item.id
+                  }" aria-label="Remove ${item.name}">Remove</button>
+                </div>
+              </li>`;
+          })
+          .join("");
+        return `
+          <section class="cart-group" aria-labelledby="cat-${cat}">
+            <h3 class="cart-group__title" id="cat-${cat}">${cat}</h3>
+            <ul class="cart-list">${items}</ul>
+          </section>`;
+      })
+      .join("");
     // Add category summary header so users know multiple categories are present
     const summary = Object.keys(byCategory)
       .sort()
       .map((c) => `${c}(${byCategory[c].reduce((s, i) => s + i.qty, 0)})`)
       .join(" • ");
 
-    // Non-sticky summary bar placed at the top of the modal content
-    wrap.innerHTML =
-      `<div style="background:#f7f9fa;padding:6px 10px;margin:0 0 8px 0;border-bottom:1px solid #ddd;font-size:12px;color:#243447;">Categories: ${summary}</div>` +
-      html;
+    // If a separate cartBar element exists (cart page), populate it; otherwise inject summary inside items wrapper (overlay case)
+    if (barEl) {
+      barEl.textContent = `Categories: ${summary}`;
+      wrap.innerHTML = html;
+    } else {
+      wrap.innerHTML =
+        `<div class="cart-summary">Categories: ${summary}</div>` + html;
+    }
     totalEl.textContent = "Total: $" + total.toFixed(2);
   }
 
@@ -252,9 +260,10 @@
       return;
     }
 
-    // Open cart
+    // Redirect to dedicated cart page instead of opening modal
     if (e.target.id === "openCartBtn") {
-      openCart();
+      if (window.location.pathname.endsWith("cart.html")) return; // already there
+      window.location.href = "cart.html";
       return;
     }
     // Close cart
@@ -264,6 +273,12 @@
     }
     if (e.target.id === "clearCart") {
       clearCart();
+      return;
+    }
+    if (e.target.id === "checkoutBtn") {
+      // Close before navigating
+      closeCart();
+      window.location.href = "checkout.html";
       return;
     }
     // Click outside overlay

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Checkout</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/checkout.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <div class="container">
+      <h1>Checkout</h1>
+      <p>Review your items and confirm your purchase.</p>
+      <div class="summary">
+        <h2>Order Summary</h2>
+        <div id="orderItems"></div>
+        <div class="line" style="font-weight: bold">
+          <span>Total</span>
+          <span id="orderTotal">$0.00</span>
+        </div>
+        <div class="actions">
+          <button class="primary" id="confirmOrder">Confirm Order</button>
+          <button class="secondary" id="backToCart">Back to Cart</button>
+        </div>
+      </div>
+    </div>
+    <script src="../js/header.js"></script>
+    <script src="../js/products.js"></script>
+    <script src="../js/checkout.js"></script>
+
+  </body>
+</html>
