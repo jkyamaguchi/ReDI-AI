@@ -117,12 +117,14 @@
   function renderCartModal() {
     const wrap = document.getElementById("cartItems");
     const totalEl = document.getElementById("cartTotal");
+    const barEl = document.getElementById("cartBar");
     if (!wrap || !totalEl) return;
     const cart = loadCart();
     if (!cart.length) {
       wrap.innerHTML =
         '<div style="text-align:center;color:#666;padding:16px;">Cart is empty.</div>';
       totalEl.textContent = "";
+      if (barEl) barEl.textContent = "Categories: none";
       return;
     }
     // Group by category for clearer multi-category cart
@@ -168,9 +170,10 @@
       .sort()
       .map((c) => `${c}(${byCategory[c].reduce((s, i) => s + i.qty, 0)})`)
       .join(" • ");
-    // Single assignment; previous version overwrote the summary bar.
+
+    // Non-sticky summary bar placed at the top of the modal content
     wrap.innerHTML =
-      `<div style="position:sticky;top:0;background:#f7f9fa;padding:6px 8px;margin:-12px -12px 8px -12px;border-bottom:1px solid #ddd;font-size:12px;color:#243447;">Categories: ${summary}</div>` +
+      `<div style="background:#f7f9fa;padding:6px 10px;margin:0 0 8px 0;border-bottom:1px solid #ddd;font-size:12px;color:#243447;">Categories: ${summary}</div>` +
       html;
     totalEl.textContent = "Total: $" + total.toFixed(2);
   }
