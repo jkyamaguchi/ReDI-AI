@@ -12,6 +12,19 @@
     <div class="container">
       <h1>Checkout</h1>
       <p>Review your items and confirm your purchase.</p>
+      <div
+        id="clusterPrediction"
+        class="segment-box"
+        style="
+          margin: 1rem 0;
+          padding: 0.75rem;
+          border: 1px dashed #888;
+          font-size: 0.9rem;
+          color: #333;
+        "
+      >
+        Segment: loading...
+      </div>
       <div class="summary">
         <h2>Order Summary</h2>
         <div id="orderItems"></div>
@@ -27,7 +40,7 @@
     </div>
     <script src="../js/header.js"></script>
     <script src="../js/products.js"></script>
+    <script src="../js/segmentation_model.js"></script>
     <script src="../js/checkout.js"></script>
-
   </body>
 </html>

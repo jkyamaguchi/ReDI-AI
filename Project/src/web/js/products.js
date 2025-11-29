@@ -313,5 +313,64 @@
     renderCartModal,
     openCart,
     closeCart,
+    /**
+     * Return cart line items in the minimal format required by the
+     * Python classify_cart() sample: [{category, price, qty}, ...]
+     * Extra fields (id, name) are excluded.
+     */
+    toSegmentationSample: function () {
+      return loadCart().map((i) => ({
+        category: i.category,
+        price: i.price,
+        qty: i.qty,
+      }));
+    },
+    /** Return segmentation sample as a JSON string */
+    toSegmentationJSON: function (space = 2) {
+      return JSON.stringify(this.toSegmentationSample(), null, space);
+    },
+    /** Copy segmentation sample JSON to clipboard */
+    copySegmentationSample: async function () {
+      try {
+        const json = this.toSegmentationJSON();
+        await navigator.clipboard.writeText(json);
+        console.log("Segmentation sample copied to clipboard");
+        return true;
+      } catch (e) {
+        console.warn("Clipboard copy failed:", e);
+        return false;
+      }
+    },
+    /** Trigger download of segmentation sample as cart_sample.json */
+    downloadSegmentationSample: function () {
+      const json = this.toSegmentationJSON();
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "cart_sample.json";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+    },
+    /**
+     * Optional helper: returns a spend summary by category that can be
+     * inspected or logged before sending. Each entry has totalSpend.
+     * (Not used directly by classify_cart, which loops line items.)
+     */
+    categorySpendSummary: function () {
+      const summary = {};
+      loadCart().forEach((i) => {
+        const cat = i.category || "other";
+        summary[cat] = (summary[cat] || 0) + i.price * i.qty;
+      });
+      return Object.entries(summary).map(([category, totalSpend]) => ({
+        category,
+        totalSpend,
+      }));
+    },
   };
 })();
