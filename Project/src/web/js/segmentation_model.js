@@ -45,7 +45,76 @@ const SEGMENTATION_MODEL = {
       -0.4556902985074631, -0.4135514221669457, -0.2677238805970136,
     ],
   ],
+  clusterProfiles: {
+    0: {
+      id: 0,
+      name: "Low Web Engagement",
+      description:
+        "Low wine preference, balanced product mix, minimal spending. Not yet converted to web channel.",
+      size: { percentage: 22.3, count: 494 },
+      metrics: {
+        wineShare: -1.32,
+        spendIntensity: -0.54,
+        dealSensitivity: "Low",
+      },
+      characteristics: [
+        "Low wine share",
+        "Low to moderate spend intensity",
+        "Few web purchases and visits",
+        "Low deal sensitivity",
+      ],
+      strategy:
+        "Convert to web with UX optimization, first-purchase discounts, educational content",
+    },
+    1: {
+      id: 1,
+      name: "High-Value Web Enthusiast",
+      description:
+        "High wine preference, premium spender, frequent web user. Most valuable segment.",
+      size: { percentage: 28.7, count: 635 },
+      metrics: {
+        wineShare: 0.26,
+        spendIntensity: 0.06,
+        webPurchases: 0.58,
+        dealSensitivity: 1.04,
+      },
+      characteristics: [
+        "High wine share",
+        "Strong spend intensity",
+        "High web purchases",
+        "High deal sensitivity",
+      ],
+      strategy:
+        "Upsell/cross-sell premium wines, push exclusive subscriptions, loyalty rewards",
+    },
+    2: {
+      id: 2,
+      name: "Deal-Seeker",
+      description:
+        "Moderate spender, deal-sensitive, moderate web engagement. Price-conscious segment.",
+      size: { percentage: 49.0, count: 1083 },
+      metrics: {
+        productPreference: -0.06,
+        spendIntensity: -0.06,
+        webPurchases: -0.14,
+        dealSensitivity: -0.27,
+      },
+      characteristics: [
+        "Balanced product preference",
+        "Moderate spend intensity",
+        "Low web purchases",
+        "Low deal sensitivity",
+      ],
+      strategy:
+        "Flash sales, targeted coupons, time-limited bundles, free shipping thresholds",
+    },
+  },
 };
+
+function getClusterProfile(clusterId) {
+  const profile = SEGMENTATION_MODEL.clusterProfiles[clusterId];
+  return profile || null;
+}
 
 function classifyCartClient(cartItems, behaviorOverrides = null) {
   if (!Array.isArray(cartItems) || !cartItems.length) {
@@ -130,6 +199,7 @@ function classifyCartClient(cartItems, behaviorOverrides = null) {
     spend4: spend4,
     shares,
     features_row: row,
+    profile: getClusterProfile(bestIdx),
   };
 }
 
@@ -171,10 +241,73 @@ function renderClusterPrediction() {
     box.className = "segment-box segment-error";
     return;
   }
-  box.innerHTML =
-    `<strong>Predicted Segment Cluster:</strong> ${finalResult.cluster} ` +
-    `(distance ${finalResult.distance.toFixed(3)})`;
-  box.className = "segment-box";
+
+  const profile = finalResult.profile;
+  const profileHTML = profile
+    ? `
+    <div class="cluster-profile cluster-${profile.id}">
+      <div class="profile-header">
+        <div class="profile-title">
+          <h2>${profile.name}</h2>
+          <span class="cluster-badge">Cluster ${finalResult.cluster}</span>
+        </div>
+        <div class="profile-size-badge">${profile.size.percentage}%</div>
+      </div>
+      
+      <div class="profile-description">${profile.description}</div>
+      
+      <div class="profile-grid">
+        <div class="profile-section characteristics-section">
+          <h3>Key Characteristics</h3>
+          <ul>
+            ${profile.characteristics.map((c) => `<li>${c}</li>`).join("")}
+          </ul>
+        </div>
+
+        <div class="profile-section metrics-section">
+          <h3>Segment Metrics</h3>
+          <ul class="metrics-list">
+            ${Object.entries(profile.metrics)
+              .map(([key, val]) => {
+                const label = key
+                  .replace(/([A-Z])/g, " $1")
+                  .replace(/^./, (str) => str.toUpperCase());
+                const display = typeof val === "number" ? val.toFixed(2) : val;
+                const metricClass =
+                  typeof val === "number"
+                    ? val > 0
+                      ? "metric-positive"
+                      : val < 0
+                      ? "metric-negative"
+                      : "metric-neutral"
+                    : "metric-text";
+                return `<li><span class="metric-label">${label}:</span> <span class="metric-value ${metricClass}">${display}</span></li>`;
+              })
+              .join("")}
+          </ul>
+        </div>
+      </div>
+      
+      <div class="profile-section strategy-section">
+        <h3>Recommended Strategy</h3>
+        <p>${profile.strategy}</p>
+      </div>
+      
+      <div class="prediction-meta">
+        <span class="meta-item">Distance: <strong>${finalResult.distance.toFixed(
+          3
+        )}</strong></span>
+        <span class="meta-item">Cart Total: <strong>$${finalResult.spend4.toFixed(
+          2
+        )}</strong></span>
+        <span class="meta-item">Population: <strong>${profile.size.count.toLocaleString()} customers</strong></span>
+      </div>
+    </div>
+  `
+    : `<div class="cluster-profile error"><strong>Unknown Cluster:</strong> ${finalResult.cluster}</div>`;
+
+  box.innerHTML = profileHTML;
+  box.className = `segment-box segment-cluster-${finalResult.cluster}`;
 }
 
 document.addEventListener("DOMContentLoaded", renderClusterPrediction);
