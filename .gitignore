@@ -6,6 +6,11 @@ Covid-19/*.csv
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Jupyter Notebook execution outputs (cells remain tracked)
+# To fully strip outputs, consider using nbstripout:
+# pip install nbstripout && nbstripout --install
 
 # OS files
 .DS_Store
