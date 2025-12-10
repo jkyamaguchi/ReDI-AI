@@ -1,11 +1,13 @@
-// Segmentation model parameters placeholder.
-// After running the notebook cell to dump JSON of scaler & kmeans, paste values below.
-// Example notebook extraction:
-// import json; print(json.dumps({
-//  'scaler_center': scaler.center_.tolist(),
-//  'scaler_scale': scaler.scale_.tolist(),
-//  'cluster_centers': kmeans.cluster_centers_.tolist()
-// }))
+/**
+ * Customer Segmentation Model
+ * K-Means clustering model for customer classification and personalization
+ */
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const CLUSTER_TEMPLATE_PATH = "templates/cluster-profile.html";
 
 const SEGMENTATION_MODEL = {
   clusterFeatures: [
@@ -111,9 +113,112 @@ const SEGMENTATION_MODEL = {
   },
 };
 
+// ============================================================================
+// TEMPLATE LOADING
+// ============================================================================
+
+let clusterTemplateCache = null;
+
+/**
+ * Fetch cluster profile template
+ * @returns {Promise<string|null>}
+ */
+async function loadClusterTemplate() {
+  if (clusterTemplateCache) return clusterTemplateCache;
+
+  try {
+    const response = await fetch(CLUSTER_TEMPLATE_PATH);
+    if (!response.ok) {
+      throw new Error(`Failed to load template: ${response.statusText}`);
+    }
+    clusterTemplateCache = await response.text();
+    return clusterTemplateCache;
+  } catch (error) {
+    console.error("Cluster template loading error:", error);
+    return null;
+  }
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
 function getClusterProfile(clusterId) {
   const profile = SEGMENTATION_MODEL.clusterProfiles[clusterId];
   return profile || null;
+}
+
+function aggregateCartSpend(cartItems) {
+  const spend = { Wines: 0, Fruits: 0, Fish: 0, Sweets: 0 };
+  cartItems.forEach((it) => {
+    const cat = (it.category || "").toLowerCase();
+    const amt = Number(it.price || 0) * Number(it.qty || 0);
+    if (cat === "wines") spend.Wines += amt;
+    else if (cat === "fruits") spend.Fruits += amt;
+    else if (cat === "fish") spend.Fish += amt;
+    else if (cat === "sweets") spend.Sweets += amt;
+  });
+  return spend;
+}
+
+function computeSharesAndIntensity(spend) {
+  const spend4 = Object.values(spend).reduce((a, b) => a + b, 0);
+  const eps = 1e-9;
+  return {
+    spend4,
+    spend_intensity: Math.log1p(spend4),
+    shares: {
+      Wines_share: spend.Wines / (spend4 + eps),
+      Fruits_share: spend.Fruits / (spend4 + eps),
+      Fish_share: spend.Fish / (spend4 + eps),
+      Sweets_share: spend.Sweets / (spend4 + eps),
+    },
+  };
+}
+
+function applyBehaviorOverrides(overrides) {
+  const defaults = {
+    NumWebPurchases: 0,
+    NumWebVisitsMonth: 0,
+    web_share: 0,
+    NumDealsPurchases: 0,
+  };
+  if (!overrides || typeof overrides !== "object") return defaults;
+  return {
+    NumWebPurchases: Number.isFinite(overrides.NumWebPurchases)
+      ? overrides.NumWebPurchases
+      : defaults.NumWebPurchases,
+    NumWebVisitsMonth: Number.isFinite(overrides.NumWebVisitsMonth)
+      ? overrides.NumWebVisitsMonth
+      : defaults.NumWebVisitsMonth,
+    web_share: Number.isFinite(overrides.web_share)
+      ? overrides.web_share
+      : defaults.web_share,
+    NumDealsPurchases: Number.isFinite(overrides.NumDealsPurchases)
+      ? overrides.NumDealsPurchases
+      : defaults.NumDealsPurchases,
+  };
+}
+
+function scaleFeatures(featureVector, scalerCenter, scalerScale) {
+  return featureVector.map((v, i) => (v - scalerCenter[i]) / scalerScale[i]);
+}
+
+function findNearestCentroid(scaledVector, clusterCenters) {
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  clusterCenters.forEach((centroid, idx) => {
+    let d = 0;
+    for (let i = 0; i < centroid.length; i++) {
+      const diff = scaledVector[i] - centroid[i];
+      d += diff * diff;
+    }
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = idx;
+    }
+  });
+  return { bestIdx, bestDist: Math.sqrt(bestDist) };
 }
 
 function classifyCartClient(cartItems, behaviorOverrides = null) {
@@ -128,87 +233,127 @@ function classifyCartClient(cartItems, behaviorOverrides = null) {
         "Model parameters missing. Fill scalerCenter, scalerScale, clusterCenters.",
     };
   }
-  const cats = ["Wines", "Fruits", "Fish", "Sweets"];
-  const spend = { Wines: 0, Fruits: 0, Fish: 0, Sweets: 0 };
-  cartItems.forEach((it) => {
-    const cat = (it.category || "").toLowerCase();
-    const amt = Number(it.price || 0) * Number(it.qty || 0);
-    if (cat === "wines") spend.Wines += amt;
-    else if (cat === "fruits") spend.Fruits += amt;
-    else if (cat === "fish") spend.Fish += amt;
-    else if (cat === "sweets") spend.Sweets += amt;
-  });
-  const spend4 = Object.values(spend).reduce((a, b) => a + b, 0);
-  const eps = 1e-9;
-  const shares = {
-    Wines_share: spend.Wines / (spend4 + eps),
-    Fruits_share: spend.Fruits / (spend4 + eps),
-    Fish_share: spend.Fish / (spend4 + eps),
-    Sweets_share: spend.Sweets / (spend4 + eps),
-  };
-  const spend_intensity = Math.log1p(spend4);
-  // Behavioral defaults (can be overridden to better match cluster 1)
-  let NumWebPurchases = 0;
-  let NumWebVisitsMonth = 0;
-  let web_share = 0; // since purchases = 0
-  let NumDealsPurchases = 0;
-  if (behaviorOverrides && typeof behaviorOverrides === "object") {
-    if (Number.isFinite(behaviorOverrides.NumWebPurchases)) {
-      NumWebPurchases = behaviorOverrides.NumWebPurchases;
-    }
-    if (Number.isFinite(behaviorOverrides.NumWebVisitsMonth)) {
-      NumWebVisitsMonth = behaviorOverrides.NumWebVisitsMonth;
-    }
-    if (Number.isFinite(behaviorOverrides.web_share)) {
-      web_share = behaviorOverrides.web_share;
-    }
-    if (Number.isFinite(behaviorOverrides.NumDealsPurchases)) {
-      NumDealsPurchases = behaviorOverrides.NumDealsPurchases;
-    }
-  }
-  const row = {
+
+  const spend = aggregateCartSpend(cartItems);
+  const { spend4, spend_intensity, shares } = computeSharesAndIntensity(spend);
+  const overrides = applyBehaviorOverrides(behaviorOverrides);
+
+  const featureRow = {
     spend_intensity,
     ...shares,
-    NumWebPurchases,
-    NumWebVisitsMonth,
-    web_share,
-    NumDealsPurchases,
+    ...overrides,
   };
-  const featureVector = clusterFeatures.map((f) => row[f] ?? 0);
-  // Scale: (x - center)/scale (RobustScaler behavior after fit)
-  const scaled = featureVector.map(
-    (v, i) => (v - scalerCenter[i]) / scalerScale[i]
-  );
-  // Find nearest centroid (centers already in scaled space)
-  let bestIdx = -1,
-    bestDist = Infinity;
-  clusterCenters.forEach((centroid, idx) => {
-    let d = 0;
-    for (let i = 0; i < centroid.length; i++) {
-      const diff = scaled[i] - centroid[i];
-      d += diff * diff;
-    }
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = idx;
-    }
-  });
+
+  const featureVector = clusterFeatures.map((f) => featureRow[f] ?? 0);
+  const scaled = scaleFeatures(featureVector, scalerCenter, scalerScale);
+  const { bestIdx, bestDist } = findNearestCentroid(scaled, clusterCenters);
+
   return {
     cluster: bestIdx,
-    distance: Math.sqrt(bestDist),
-    spend4: spend4,
+    distance: bestDist,
+    spend4,
     shares,
-    features_row: row,
+    features_row: featureRow,
     profile: getClusterProfile(bestIdx),
   };
 }
 
-function renderClusterPrediction() {
+// ============================================================================
+// DOM POPULATION HELPERS
+// ============================================================================
+
+/**
+ * Populate template with cluster profile data
+ * @param {HTMLElement} container - Container with template structure
+ * @param {Object} profile - Cluster profile data
+ * @param {Object} result - Classification result
+ */
+function populateClusterProfile(container, profile, result) {
+  // Populate header
+  const profileName = container.querySelector("#profileName");
+  const clusterBadge = container.querySelector("#clusterBadge");
+  const sizeBadge = container.querySelector("#profileSizeBadge");
+
+  if (profileName) profileName.textContent = profile.name;
+  if (clusterBadge) clusterBadge.textContent = `Cluster ${result.cluster}`;
+  if (sizeBadge) sizeBadge.textContent = `${profile.size.percentage}%`;
+
+  // Populate description
+  const description = container.querySelector("#profileDescription");
+  if (description) description.textContent = profile.description;
+
+  // Populate characteristics
+  const charsList = container.querySelector("#characteristicsList");
+  if (charsList) {
+    const fragment = document.createDocumentFragment();
+    profile.characteristics.forEach((c) => {
+      const li = document.createElement("li");
+      li.textContent = c;
+      fragment.appendChild(li);
+    });
+    charsList.replaceChildren(fragment);
+  }
+
+  // Populate metrics
+  const metricsList = container.querySelector("#metricsList");
+  if (metricsList) {
+    const fragment = document.createDocumentFragment();
+    Object.entries(profile.metrics).forEach(([key, val]) => {
+      const li = document.createElement("li");
+
+      const labelSpan = document.createElement("span");
+      labelSpan.className = "metric-label";
+      labelSpan.textContent =
+        key
+          .replace(/([A-Z])/g, " $1")
+          .replace(/^./, (str) => str.toUpperCase()) + ":";
+      li.appendChild(labelSpan);
+
+      const valueSpan = document.createElement("span");
+      const isNumber = typeof val === "number";
+      const metricClass = isNumber
+        ? val > 0
+          ? "metric-positive"
+          : val < 0
+          ? "metric-negative"
+          : "metric-neutral"
+        : "metric-text";
+      valueSpan.className = `metric-value ${metricClass}`;
+      valueSpan.textContent = isNumber ? val.toFixed(2) : val;
+      li.appendChild(valueSpan);
+
+      fragment.appendChild(li);
+    });
+    metricsList.replaceChildren(fragment);
+  }
+
+  // Populate strategy
+  const strategyText = container.querySelector("#strategyText");
+  if (strategyText) strategyText.textContent = profile.strategy;
+
+  // Populate meta information
+  const metaDistance = container.querySelector("#metaDistance");
+  const metaTotal = container.querySelector("#metaTotal");
+  const metaPopulation = container.querySelector("#metaPopulation");
+
+  if (metaDistance) metaDistance.textContent = result.distance.toFixed(3);
+  if (metaTotal) metaTotal.textContent = `$${result.spend4.toFixed(2)}`;
+  if (metaPopulation)
+    metaPopulation.textContent = `${profile.size.count.toLocaleString()} customers`;
+
+  // Apply cluster-specific class
+  container.className = `cluster-profile cluster-${profile.id}`;
+}
+
+// ============================================================================
+// RENDERING FUNCTIONS
+// ============================================================================
+
+async function renderClusterPrediction() {
   const box = document.getElementById("clusterPrediction");
   if (!box || !window.cartAPI) return;
   const sample = window.cartAPI.toSegmentationSample();
 
-  // First classify with zero behavioral values to see natural cart tendency
   const baseResult = classifyCartClient(sample, {
     NumWebPurchases: 0,
     NumWebVisitsMonth: 0,
@@ -216,98 +361,72 @@ function renderClusterPrediction() {
     NumDealsPurchases: 0,
   });
 
-  let finalResult;
-  // If base classification suggests high-value cart (cluster 1 territory),
-  // apply positive behavioral defaults; otherwise keep behavioral zeros
-  if (
-    baseResult.spend4 > 150 &&
-    baseResult.shares.Wines_share > 0.75 &&
-    baseResult.shares.Wines_share < 0.9
-  ) {
-    // High wine share + high spend = likely Cluster 1 with web behavior
-    finalResult = classifyCartClient(sample, {
-      NumWebPurchases: 2,
-      NumWebVisitsMonth: 6,
-      web_share: 0.7,
-      NumDealsPurchases: 2,
-    });
-  } else {
-    // Use zero behavioral values (Cluster 0 or Cluster 2)
-    finalResult = baseResult;
-  }
-
-  if (finalResult.error) {
-    box.textContent = "Segment: " + finalResult.error;
+  if (baseResult.error) {
+    box.textContent = "Segment: " + baseResult.error;
     box.className = "segment-box segment-error";
     return;
   }
 
-  const profile = finalResult.profile;
-  const profileHTML = profile
-    ? `
-    <div class="cluster-profile cluster-${profile.id}">
-      <div class="profile-header">
-        <div class="profile-title">
-          <h2>${profile.name}</h2>
-          <span class="cluster-badge">Cluster ${finalResult.cluster}</span>
-        </div>
-        <div class="profile-size-badge">${profile.size.percentage}%</div>
-      </div>
-      
-      <div class="profile-description">${profile.description}</div>
-      
-      <div class="profile-grid">
-        <div class="profile-section characteristics-section">
-          <h3>Key Characteristics</h3>
-          <ul>
-            ${profile.characteristics.map((c) => `<li>${c}</li>`).join("")}
-          </ul>
-        </div>
+  const shouldBoostToCluster1 =
+    baseResult.spend4 > 150 &&
+    baseResult.shares.Wines_share > 0.75 &&
+    baseResult.shares.Wines_share < 0.9;
 
-        <div class="profile-section metrics-section">
-          <h3>Segment Metrics</h3>
-          <ul class="metrics-list">
-            ${Object.entries(profile.metrics)
-              .map(([key, val]) => {
-                const label = key
-                  .replace(/([A-Z])/g, " $1")
-                  .replace(/^./, (str) => str.toUpperCase());
-                const display = typeof val === "number" ? val.toFixed(2) : val;
-                const metricClass =
-                  typeof val === "number"
-                    ? val > 0
-                      ? "metric-positive"
-                      : val < 0
-                      ? "metric-negative"
-                      : "metric-neutral"
-                    : "metric-text";
-                return `<li><span class="metric-label">${label}:</span> <span class="metric-value ${metricClass}">${display}</span></li>`;
-              })
-              .join("")}
-          </ul>
-        </div>
-      </div>
-      
-      <div class="profile-section strategy-section">
-        <h3>Recommended Strategy</h3>
-        <p>${profile.strategy}</p>
-      </div>
-      
-      <div class="prediction-meta">
-        <span class="meta-item">Distance: <strong>${finalResult.distance.toFixed(
-          3
-        )}</strong></span>
-        <span class="meta-item">Cart Total: <strong>$${finalResult.spend4.toFixed(
-          2
-        )}</strong></span>
-        <span class="meta-item">Population: <strong>${profile.size.count.toLocaleString()} customers</strong></span>
-      </div>
-    </div>
-  `
-    : `<div class="cluster-profile error"><strong>Unknown Cluster:</strong> ${finalResult.cluster}</div>`;
+  const boostedResult = shouldBoostToCluster1
+    ? classifyCartClient(sample, {
+        NumWebPurchases: 2,
+        NumWebVisitsMonth: 6,
+        web_share: 0.7,
+        NumDealsPurchases: 2,
+      })
+    : baseResult;
 
-  box.innerHTML = profileHTML;
-  box.className = `segment-box segment-cluster-${finalResult.cluster}`;
+  const result = boostedResult.error ? baseResult : boostedResult;
+  const profile = result.profile;
+
+  if (!profile) {
+    const errorDiv = document.createElement("div");
+    errorDiv.className = "cluster-profile error";
+    const strong = document.createElement("strong");
+    strong.textContent = "Unknown Cluster:";
+    errorDiv.appendChild(strong);
+    errorDiv.appendChild(document.createTextNode(` ${result.cluster}`));
+    box.replaceChildren(errorDiv);
+    box.className = `segment-box segment-cluster-${result.cluster}`;
+    return;
+  }
+
+  // Load template
+  const templateHTML = await loadClusterTemplate();
+  if (!templateHTML) {
+    console.error("Could not load cluster profile template");
+    box.textContent = "Error loading profile template";
+    return;
+  }
+
+  // Create temporary container to parse template
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = templateHTML;
+  const container = tempDiv.firstElementChild;
+
+  if (!container) {
+    console.error("Invalid cluster profile template");
+    return;
+  }
+
+  // Populate template with data
+  populateClusterProfile(container, profile, result);
+
+  // Replace box content
+  box.replaceChildren(container);
+  box.className = `segment-box segment-cluster-${result.cluster}`;
 }
+
+// ============================================================================
+// PUBLIC API & INITIALIZATION
+// ============================================================================
+
+// Export for use by other modules (e.g., checkout.js)
+window.renderClusterPrediction = renderClusterPrediction;
 
 document.addEventListener("DOMContentLoaded", renderClusterPrediction);

@@ -1,0 +1,29 @@
+<div class="container">
+  <h1>Checkout</h1>
+  <p>Review your items and confirm your purchase.</p>
+  <div
+    id="clusterPrediction"
+    class="segment-box"
+    style="
+      margin: 1rem 0;
+      padding: 0.75rem;
+      border: 1px dashed #888;
+      font-size: 0.9rem;
+      color: #333;
+    "
+  >
+    Segment: loading...
+  </div>
+  <div class="summary">
+    <h2>Order Summary</h2>
+    <div id="orderItems"></div>
+    <div class="line" style="font-weight: bold">
+      <span>Total</span>
+      <span id="orderTotal">$0.00</span>
+    </div>
+    <div class="actions">
+      <button class="primary" id="confirmOrder">Confirm Order</button>
+      <button class="secondary" id="backToCart">Back to Cart</button>
+    </div>
+  </div>
+</div>

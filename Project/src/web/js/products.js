@@ -1,7 +1,12 @@
-// Cart + catalog controller (refactored)
+/**
+ * Cart & Catalog Controller
+ * Manages shopping cart operations, catalog rendering, and user interactions
+ */
 
 (function () {
+  // CONSTANTS
   const STORAGE_KEY = "cart:v1";
+  const ADD_TO_CART_FEEDBACK_DURATION = 900; // ms
 
   // Catalog (extend as needed)
   const CATALOG = {
@@ -53,10 +58,13 @@
       { id: "sweet-5", name: "Gummy Bears", price: 2.8 },
       { id: "sweet-6", name: "Dark Chocolate Bar", price: 3.5 },
     ],
-    // add other categories later (meat, fruits, sweets, gold)
   };
 
-  // --- Cart persistence ---
+  // STORAGE OPERATIONS
+  /**
+   * Load cart from localStorage
+   * @returns {Array} Cart items array
+   */
   function loadCart() {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -65,127 +73,268 @@
     }
   }
 
+  /**
+   * Save cart to localStorage and sync UI
+   * @param {Array} cart - Cart items array
+   */
   function saveCart(cart) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
     updateCartCount();
-    renderCartModal(); // keep modal synced
+    renderCartModal();
   }
 
+  // CATALOG OPERATIONS
+  /**
+   * Find product by category and ID
+   * @param {string} category - Product category
+   * @param {string} id - Product ID
+   * @returns {Object|undefined} Product object or undefined
+   */
   function findProduct(category, id) {
-    const list = CATALOG[category] || [];
-    return list.find((p) => p.id === id);
+    const items = CATALOG[category];
+    return items ? items.find((p) => p.id === id) : undefined;
   }
 
-  // --- Public cart ops ---
+  // CART OPERATIONS
+  /**
+   * Add product to cart or increment quantity if already exists
+   * @param {string} category - Product category
+   * @param {string} id - Product ID
+   */
   function addToCart(category, id) {
     const product = findProduct(category, id);
     if (!product) return;
+
     const cart = loadCart();
-    // Match both id and category to avoid merging same ids from different categories
-    const item = cart.find((i) => i.id === id && i.category === category);
-    if (item) {
-      item.qty += 1;
+    const existingItem = cart.find(
+      (item) => item.id === id && item.category === category
+    );
+
+    if (existingItem) {
+      existingItem.qty += 1;
     } else {
       cart.push({
         id: product.id,
         name: product.name,
         price: product.price,
-        category: category,
+        category,
         qty: 1,
       });
     }
+
     saveCart(cart);
   }
 
+  /**
+   * Remove item from cart by ID
+   * @param {string} id - Product ID to remove
+   */
   function removeFromCart(id) {
-    const cart = loadCart().filter((i) => i.id !== id);
-    saveCart(cart);
+    saveCart(loadCart().filter((item) => item.id !== id));
   }
 
+  /**
+   * Clear all items from cart
+   */
   function clearCart() {
     saveCart([]);
   }
 
+  // UI UPDATE OPERATIONS
+  /**
+   * Update cart count badge in header
+   */
   function updateCartCount() {
-    const el = document.getElementById("cartCount");
-    if (!el) return;
-    const total = loadCart().reduce((s, i) => s + i.qty, 0);
-    el.textContent = total;
+    const badge = document.getElementById("cartCount");
+    if (!badge) return;
+
+    const totalItems = loadCart().reduce((sum, item) => sum + item.qty, 0);
+    badge.textContent = totalItems;
   }
 
-  // --- Modal rendering & controls ---
+  // DOM CREATION HELPERS
+  /**
+   * Create a cart item DOM element
+   * @param {Object} item - Cart item object
+   * @returns {HTMLElement} List item element
+   */
+  function createCartItem(item) {
+    const li = document.createElement("li");
+    li.className = "cart-item";
+    li.dataset.id = item.id;
+
+    // Item info section
+    const info = document.createElement("div");
+    info.className = "cart-item__info";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "cart-item__name";
+    nameSpan.textContent = item.name;
+
+    const priceSpan = document.createElement("span");
+    priceSpan.className = "cart-item__unit-price";
+    priceSpan.textContent = `$${item.price.toFixed(2)} each`;
+
+    info.appendChild(nameSpan);
+    info.appendChild(priceSpan);
+    li.appendChild(info);
+
+    // Quantity controls section
+    const controls = document.createElement("div");
+    controls.className = "cart-item__controls";
+
+    // Helper function to create control button
+    const createButton = (className, action, label, text) => {
+      const btn = document.createElement("button");
+      btn.className = className;
+      btn.dataset.act = action;
+      btn.dataset.id = item.id;
+      btn.setAttribute("aria-label", label);
+      btn.textContent = text;
+      return btn;
+    };
+
+    controls.appendChild(
+      createButton("qty-btn", "dec", "Decrease quantity", "−")
+    );
+
+    const qtyOutput = document.createElement("output");
+    qtyOutput.className = "qty";
+    qtyOutput.setAttribute("aria-live", "polite");
+    qtyOutput.textContent = item.qty;
+    controls.appendChild(qtyOutput);
+
+    controls.appendChild(
+      createButton("qty-btn", "inc", "Increase quantity", "+")
+    );
+    controls.appendChild(
+      createButton("btn-remove", "remove", `Remove ${item.name}`, "Remove")
+    );
+
+    li.appendChild(controls);
+    return li;
+  }
+
+  /**
+   * Create a category group section for cart modal
+   * @param {string} category - Category name
+   * @param {Array} items - Items in this category
+   * @returns {HTMLElement} Section element
+   */
+  function createCategoryGroup(category, items) {
+    const section = document.createElement("section");
+    section.className = "cart-group";
+    section.setAttribute("aria-labelledby", `cat-${category}`);
+
+    const h3 = document.createElement("h3");
+    h3.className = "cart-group__title";
+    h3.id = `cat-${category}`;
+    h3.textContent = category;
+    section.appendChild(h3);
+
+    const ul = document.createElement("ul");
+    ul.className = "cart-list";
+    items.forEach((item) => ul.appendChild(createCartItem(item)));
+    section.appendChild(ul);
+
+    return section;
+  }
+
+  /**
+   * Group cart items by category
+   * @param {Array} cart - Cart items array
+   * @returns {Object} Object with categories as keys and item arrays as values
+   */
+  function groupCartByCategory(cart) {
+    return cart.reduce((grouped, item) => {
+      const category = item.category || "other";
+      (grouped[category] = grouped[category] || []).push(item);
+      return grouped;
+    }, {});
+  }
+
+  /**
+   * Calculate total cart value
+   * @param {Array} cart - Cart items array
+   * @returns {number} Total price
+   */
+  function calculateCartTotal(cart) {
+    return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  }
+
+  /**
+   * Create summary string of categories and quantities
+   * @param {Object} byCategory - Grouped cart items
+   * @returns {string} Summary string (e.g., "wines(3) • fish(2)")
+   */
+  function createCategorySummary(byCategory) {
+    return Object.keys(byCategory)
+      .sort()
+      .map((cat) => {
+        const qty = byCategory[cat].reduce((sum, item) => sum + item.qty, 0);
+        return `${cat}(${qty})`;
+      })
+      .join(" • ");
+  }
+
+   // CART MODAL RENDERING
+   /**
+   * Render cart modal content with all items and total
+   */
   function renderCartModal() {
     const wrap = document.getElementById("cartItems");
     const totalEl = document.getElementById("cartTotal");
     const barEl = document.getElementById("cartBar");
     if (!wrap || !totalEl) return;
+
     const cart = loadCart();
+
+    // Handle empty cart
     if (!cart.length) {
-      wrap.innerHTML = '<div class="empty">Cart is empty.</div>';
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "empty";
+      emptyDiv.textContent = "Cart is empty.";
+      wrap.replaceChildren(emptyDiv);
       totalEl.textContent = "";
       if (barEl) barEl.textContent = "Categories: none";
       return;
     }
-    // Group by category for clearer multi-category cart
-    const byCategory = cart.reduce((acc, item) => {
-      const cat = item.category || "other";
-      (acc[cat] = acc[cat] || []).push(item);
-      return acc;
-    }, {});
-    let total = 0;
-    const groups = Object.keys(byCategory).sort();
-    const html = groups
-      .map((cat) => {
-        const items = byCategory[cat]
-          .map((item) => {
-            total += item.price * item.qty;
-            return `
-              <li class="cart-item" data-id="${item.id}">
-                <div class="cart-item__info">
-                  <span class="cart-item__name">${item.name}</span>
-                  <span class="cart-item__unit-price">$${item.price.toFixed(
-                    2
-                  )} each</span>
-                </div>
-                <div class="cart-item__controls">
-                  <button class="qty-btn" data-act="dec" data-id="${
-                    item.id
-                  }" aria-label="Decrease quantity">−</button>
-                  <output class="qty" aria-live="polite">${item.qty}</output>
-                  <button class="qty-btn" data-act="inc" data-id="${
-                    item.id
-                  }" aria-label="Increase quantity">+</button>
-                  <button class="btn-remove" data-act="remove" data-id="${
-                    item.id
-                  }" aria-label="Remove ${item.name}">Remove</button>
-                </div>
-              </li>`;
-          })
-          .join("");
-        return `
-          <section class="cart-group" aria-labelledby="cat-${cat}">
-            <h3 class="cart-group__title" id="cat-${cat}">${cat}</h3>
-            <ul class="cart-list">${items}</ul>
-          </section>`;
-      })
-      .join("");
-    // Add category summary header so users know multiple categories are present
-    const summary = Object.keys(byCategory)
-      .sort()
-      .map((c) => `${c}(${byCategory[c].reduce((s, i) => s + i.qty, 0)})`)
-      .join(" • ");
 
-    // If a separate cartBar element exists (cart page), populate it; otherwise inject summary inside items wrapper (overlay case)
+    // Calculate cart data
+    const byCategory = groupCartByCategory(cart);
+    const total = calculateCartTotal(cart);
+    const summary = createCategorySummary(byCategory);
+
+    // Build DOM fragment
+    const fragment = document.createDocumentFragment();
+
+    // Add category summary
     if (barEl) {
       barEl.textContent = `Categories: ${summary}`;
-      wrap.innerHTML = html;
     } else {
-      wrap.innerHTML =
-        `<div class="cart-summary">Categories: ${summary}</div>` + html;
+      const summaryDiv = document.createElement("div");
+      summaryDiv.className = "cart-summary";
+      summaryDiv.textContent = `Categories: ${summary}`;
+      fragment.appendChild(summaryDiv);
     }
-    totalEl.textContent = "Total: $" + total.toFixed(2);
+
+    // Add category groups (sorted alphabetically)
+    Object.keys(byCategory)
+      .sort()
+      .forEach((category) => {
+        fragment.appendChild(
+          createCategoryGroup(category, byCategory[category])
+        );
+      });
+
+    // Update DOM
+    wrap.replaceChildren(fragment);
+    totalEl.textContent = `Total: $${total.toFixed(2)}`;
   }
 
+  /**
+   * Open cart modal overlay
+   */
   function openCart() {
     const overlay = document.getElementById("cartOverlay");
     if (!overlay) return;
@@ -193,126 +342,189 @@
     overlay.style.display = "flex";
   }
 
+  /**
+   * Close cart modal overlay
+   */
   function closeCart() {
     const overlay = document.getElementById("cartOverlay");
     if (overlay) overlay.style.display = "none";
   }
 
-  // Optional: dynamic renderer (unused by static wine.html but available)
+  // PRODUCT CATALOG RENDERING
+  /**
+   * Create a product card DOM element
+   * @param {Object} product - Product object
+   * @param {string} category - Product category
+   * @returns {HTMLElement} Product card div
+   */
+  function createProductCard(product, category) {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const h3 = document.createElement("h3");
+    h3.textContent = product.name;
+    card.appendChild(h3);
+
+    const priceDiv = document.createElement("div");
+    priceDiv.className = "price";
+    priceDiv.textContent = `$${product.price.toFixed(2)}`;
+    card.appendChild(priceDiv);
+
+    const button = document.createElement("button");
+    button.dataset.category = category;
+    button.dataset.id = product.id;
+    button.textContent = "Add to Cart";
+    card.appendChild(button);
+
+    return card;
+  }
+
+  /**
+   * Render all products for a category into target element
+   * @param {string} category - Category name
+   * @param {string} targetId - Target DOM element ID
+   */
   function renderCategory(category, targetId) {
     const target = document.getElementById(targetId);
     if (!target) return;
     const items = CATALOG[category] || [];
-    target.innerHTML = items
-      .map(
-        (p) => `
-      <div class="card">
-        <h3>${p.name}</h3>
-        <div class="price">$${p.price.toFixed(2)}</div>
-        <button data-category="${category}" data-id="${
-          p.id
-        }">Add to Cart</button>
-      </div>
-    `
-      )
-      .join("");
+
+    const fragment = document.createDocumentFragment();
+    items.forEach((product) => {
+      fragment.appendChild(createProductCard(product, category));
+    });
+
+    target.replaceChildren(fragment);
   }
 
-  // Event delegation: add buttons + cart modal controls
+  // EVENT HANDLERS
+  /**
+   * Handle add to cart button click with feedback
+   * @param {HTMLElement} button - Add to cart button element
+   */
+  function handleAddToCart(button) {
+    const category = button.getAttribute("data-category");
+    const id = button.getAttribute("data-id");
+
+    addToCart(category, id);
+
+    button.textContent = "Added ✓";
+    setTimeout(() => {
+      button.textContent = "Add to Cart";
+    }, ADD_TO_CART_FEEDBACK_DURATION);
+  }
+
+  /**
+   * Handle quantity increment/decrement
+   * @param {string} action - "inc" or "dec"
+   * @param {string} id - Product ID
+   */
+  function handleQuantityChange(action, id) {
+    const cart = loadCart();
+    const item = cart.find((i) => i.id === id);
+    if (!item) return;
+
+    if (action === "inc") {
+      item.qty += 1;
+    } else if (action === "dec") {
+      item.qty -= 1;
+      if (item.qty <= 0) {
+        cart.splice(cart.indexOf(item), 1);
+      }
+    }
+
+    saveCart(cart);
+  }
+
+  // Event delegation for all click interactions
   document.addEventListener("click", (e) => {
+    const target = e.target;
+
     // Add to cart button
-    const addBtn = e.target.closest("button[data-id][data-category]");
+    const addBtn = target.closest("button[data-id][data-category]");
     if (addBtn) {
-      addToCart(
-        addBtn.getAttribute("data-category"),
-        addBtn.getAttribute("data-id")
-      );
-      addBtn.textContent = "Added ✓";
-      setTimeout(() => {
-        addBtn.textContent = "Add to Cart";
-      }, 900);
+      handleAddToCart(addBtn);
       return;
     }
 
-    const act = e.target.getAttribute("data-act");
-    const id = e.target.getAttribute("data-id");
-    if (act === "inc") {
-      const cart = loadCart();
-      const item = cart.find((i) => i.id === id);
-      if (item) {
-        item.qty += 1;
-        saveCart(cart);
-      }
+    // Quantity and remove controls
+    const action = target.getAttribute("data-act");
+    const id = target.getAttribute("data-id");
+
+    if (action === "inc" || action === "dec") {
+      handleQuantityChange(action, id);
       return;
     }
-    if (act === "dec") {
-      const cart = loadCart();
-      const item = cart.find((i) => i.id === id);
-      if (item) {
-        item.qty -= 1;
-        if (item.qty <= 0) cart.splice(cart.indexOf(item), 1);
-        saveCart(cart);
-      }
-      return;
-    }
-    if (act === "remove") {
+
+    if (action === "remove") {
       removeFromCart(id);
       return;
     }
 
-    // Redirect to dedicated cart page instead of opening modal
-    if (e.target.id === "openCartBtn") {
-      if (window.location.pathname.endsWith("cart.html")) return; // already there
-      window.location.href = "cart.html";
-      return;
-    }
-    // Close cart
-    if (e.target.id === "closeCart") {
-      closeCart();
-      return;
-    }
-    if (e.target.id === "clearCart") {
-      clearCart();
-      return;
-    }
-    if (e.target.id === "checkoutBtn") {
-      // Close before navigating
-      closeCart();
-      window.location.href = "checkout.html";
-      return;
-    }
-    // Click outside overlay
-    if (
-      e.target.id === "cartOverlay" &&
-      e.target === document.getElementById("cartOverlay")
-    ) {
-      closeCart();
-      return;
+    // Navigation and modal controls
+    switch (target.id) {
+      case "openCartBtn":
+        if (!window.location.pathname.endsWith("cart.html")) {
+          window.location.href = "cart.html";
+        }
+        return;
+
+      case "closeCart":
+        closeCart();
+        return;
+
+      case "clearCart":
+        clearCart();
+        return;
+
+      case "checkoutBtn":
+        closeCart();
+        window.location.href = "checkout.html";
+        return;
+
+      case "cartOverlay":
+        if (target === document.getElementById("cartOverlay")) {
+          closeCart();
+        }
+        return;
     }
   });
 
+  // Keyboard shortcuts
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeCart();
   });
 
-  // Init
+  // INITIALIZATION
   document.addEventListener("DOMContentLoaded", () => {
-    if (window.cartAPI) {
-      window.cartAPI.updateCartCount();
-    } else {
-      updateCartCount();
-    }
+    updateCartCount();
   });
 
+  // PUBLIC API
+  /**
+   * Public API for cart operations and segmentation integration
+   * @namespace cartAPI
+   */
   window.cartAPI = {
+    // Core cart operations
     add: addToCart,
     remove: removeFromCart,
     clear: clearCart,
     get: loadCart,
+
+    // UI operations
     updateCartCount,
     renderCartModal,
     openCart,
     closeCart,
+
+    // Segmentation integration
+
+    /**
+     * Convert cart to segmentation format for ML model
+     * Returns minimal format: [{category, price, qty}, ...]
+     * @returns {Array} Segmentation-ready cart data
+     */
     /**
      * Return cart line items in the minimal format required by the
      * Python classify_cart() sample: [{category, price, qty}, ...]
@@ -325,11 +537,20 @@
         qty: i.qty,
       }));
     },
-    /** Return segmentation sample as a JSON string */
+
+    /**
+     * Convert segmentation sample to JSON string
+     * @param {number} space - JSON indentation spaces
+     * @returns {string} JSON string
+     */
     toSegmentationJSON: function (space = 2) {
       return JSON.stringify(this.toSegmentationSample(), null, space);
     },
-    /** Copy segmentation sample JSON to clipboard */
+
+    /**
+     * Copy segmentation sample to clipboard
+     * @returns {Promise<boolean>} Success status
+     */
     copySegmentationSample: async function () {
       try {
         const json = this.toSegmentationJSON();
@@ -341,32 +562,36 @@
         return false;
       }
     },
-    /** Trigger download of segmentation sample as cart_sample.json */
+
+    /**
+     * Download segmentation sample as JSON file
+     */
     downloadSegmentationSample: function () {
       const json = this.toSegmentationJSON();
       const blob = new Blob([json], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "cart_sample.json";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 0);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "cart_sample.json";
+      link.click();
+
+      // Cleanup
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     },
+
     /**
-     * Optional helper: returns a spend summary by category that can be
-     * inspected or logged before sending. Each entry has totalSpend.
-     * (Not used directly by classify_cart, which loops line items.)
+     * Get spending summary grouped by category
+     * @returns {Array<{category: string, totalSpend: number}>} Spend summary
      */
     categorySpendSummary: function () {
       const summary = {};
-      loadCart().forEach((i) => {
-        const cat = i.category || "other";
-        summary[cat] = (summary[cat] || 0) + i.price * i.qty;
+
+      loadCart().forEach((item) => {
+        const category = item.category || "other";
+        summary[category] = (summary[category] || 0) + item.price * item.qty;
       });
+
       return Object.entries(summary).map(([category, totalSpend]) => ({
         category,
         totalSpend,
