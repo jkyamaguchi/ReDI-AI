@@ -492,20 +492,6 @@ window.renderClusterPrediction(); // Manually trigger render
 - [ ] Advanced visualizations (D3.js)
 - [ ] PWA features for offline shopping
 
----
-
-## 📄 License
-
-This project is part of the ReDI School curriculum.
-
----
-
-## 👤 Author
-
-Juliana Yamaguchi
-
----
-
 ## 🙏 Acknowledgments
 
 - ReDI School for AI/ML curriculum
